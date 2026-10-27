@@ -1,4 +1,4 @@
-# Proxy Pool (PP)
+# Proxy Pool (PP).
 
 Public proxy scraper + liveness tester, wrapped in an interactive shell. Every state
 file lives in this folder as JSON/TXT.
