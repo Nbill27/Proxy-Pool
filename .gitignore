@@ -1,0 +1,31 @@
+# data runtime
+candidates.txt
+proxies.json
+config.json
+pool-*.json
+pool-*.txt
+pool-*.csv
+pool-*.env
+.ppp_history
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

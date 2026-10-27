@@ -1,0 +1,12 @@
+{
+  "concurrency": 200,
+  "timeout": 8,
+  "ai": {
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "ISI_API_KEY_DISINI",
+    "model": "gpt-4o-mini",
+    "temperature": 0.4,
+    "max_tokens": 1200,
+    "enabled": false
+  }
+}

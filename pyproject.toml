@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ppp"
+version = "2.0.0"
+description = "Proxy pool terminal: scrape, uji, dan kelola proxy publik dari satu shell"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["aiohttp>=3.9"]
+
+[project.optional-dependencies]
+socks = ["python-socks>=2.4"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.6"]
+
+[project.scripts]
+ppp = "cli:main"
+
+[tool.setuptools]
+packages = ["ppp"]
+py-modules = ["cli"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
