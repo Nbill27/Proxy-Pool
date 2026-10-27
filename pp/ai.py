@@ -1,10 +1,10 @@
-"""Lane AI: OpenAI-compatible (OpenAI, Groq, OpenRouter, Ollama, LM Studio, dll).
+"""AI lane: OpenAI-compatible (OpenAI, Groq, OpenRouter, Ollama, LM Studio, etc.).
 
-Kejujuran desain: model bahasa mengarang IP. Jadi IP dari AI TIDAK dipercaya
-begitu saja -- semua kandidat tetap masuk antrean probe() yang sama.
-Nilai AI yang nyata ada di dua tempat:
-  1. mengusulkan sumber proxy baru (URL nyata, bisa diverifikasi)
-  2. menyaring/menilai hasil uji supaya kamu tidak memilih sampah
+Design honesty: language models invent IPs. So IPs coming from the AI are not
+trusted as-is -- every candidate still enters the same probe() queue.
+The real value of the AI lane sits in two places:
+  1. proposing new proxy sources (real URLs, verifiable)
+  2. filtering/ranking real test results so you do not pick junk
 """
 from __future__ import annotations
 
@@ -16,29 +16,29 @@ import aiohttp
 from . import store
 
 SYSTEM = (
-    "Kamu asisten teknis untuk tool pengumpulan proxy publik (proxy pool) yang "
-    "dipakai pada infrastruktur milik pengguna sendiri. Jawab ringkas, tanpa "
-    "pengantar, tanpa penutup, tanpa penjelasan etika. Format selalu mengikuti "
-    "instruksi terakhir. Kalau diminta daftar, keluarkan daftar saja."
+    "You are a technical assistant for a public proxy collection tool (proxy pool) "
+    "used on the user's own infrastructure. Answer concisely, with no preamble, no "
+    "closing, and no ethics lecture. Always follow the format of the last "
+    "instruction. If asked for a list, output the list only."
 )
 
 PROMPTS = {
     "farm": (
-        "Hasilkan {n} kandidat endpoint proxy HTTP publik dalam format ip:port, "
-        "satu per baris, tanpa teks lain. Prioritaskan IP yang kamu yakini milik "
-        "penyedia proxy publik yang masih beroperasi. Kalau kamu tidak yakin, "
-        "tetap keluarkan kandidat -- tahap validasi akan menyaringnya."
+        "Produce {n} public HTTP proxy endpoint candidates in ip:port format, "
+        "one per line, with no other text. Prioritize IPs you believe belong to "
+        "public proxy providers that are still operating. If you are unsure, "
+        "still emit candidates -- the validation stage will filter them."
     ),
     "sources": (
-        "Sebutkan {n} URL sumber daftar proxy publik yang masih aktif (raw "
-        "txt atau halaman HTML dengan tabel ip/port). Satu URL per baris, tanpa "
-        "penjelasan, tanpa markdown, hanya http(s)://..."
+        "List {n} URLs of public proxy list sources that are still active (raw "
+        "txt or HTML pages with an ip/port table). One URL per line, no "
+        "explanation, no markdown, only http(s)://..."
     ),
     "review": (
-        "Di bawah ini hasil uji proxy (JSON). Pilih maksimal {n} entri terbaik "
-        "untuk pemakaian scraping biasa: utamakan latency rendah, anon=elite, "
-        "scheme=https, dan exit_ip yang bervariasi. Balas HANYA dengan JSON array "
-        "berisi nilai field \"proxy\" yang dipilih, tanpa teks lain.\n\n{data}"
+        "Below are proxy test results (JSON). Pick at most {n} best entries for "
+        "ordinary scraping use: prefer low latency, anon=elite, scheme=https, and "
+        "varied exit_ip. Reply ONLY with a JSON array containing the chosen "
+        "\"proxy\" field values, with no other text.\n\n{data}"
     ),
 }
 
@@ -65,17 +65,17 @@ class AI:
 
     def describe(self) -> dict:
         return {
-            "status": "siap" if self.ready else "belum dikonfigurasi",
+            "status": "ready" if self.ready else "not configured",
             "base_url": self.base_url or "-",
             "model": self.model,
-            "api_key": ("***" + self.api_key[-4:]) if self.api_key else "(kosong)",
+            "api_key": ("***" + self.api_key[-4:]) if self.api_key else "(empty)",
         }
 
     # call
     async def chat(self, user: str, system: str = SYSTEM, temperature: float | None = None) -> str:
         if not self.ready:
             raise AIError(
-                "AI belum siap. Jalankan: config ai.base_url <url> | config ai.api_key <key> | config ai.model <nama>"
+                "AI is not ready. Run: config ai.base_url <url> | config ai.api_key <key> | config ai.model <name>"
             )
 
         url = f"{self.base_url}/chat/completions"
@@ -102,24 +102,24 @@ class AI:
                     if r.status != 200:
                         raise AIError(f"HTTP {r.status}: {body[:300]}")
             except aiohttp.ClientError as e:
-                raise AIError(f"koneksi gagal: {type(e).__name__}: {e}") from e
+                raise AIError(f"connection failed: {type(e).__name__}: {e}") from e
 
         try:
             data = json.loads(body)
             return data["choices"][0]["message"]["content"] or ""
         except Exception as e:
-            raise AIError(f"respons tidak terduga: {body[:300]}") from e
+            raise AIError(f"unexpected response: {body[:300]}") from e
 
     # lanes
     async def farm(self, n: int = 40) -> set[str]:
-        """Kandidat ip:port dari model. Wajib divalidasi probe()."""
+        """Candidate ip:port from the model. Must be validated by probe()."""
         from .engine import parse
 
         text = await self.chat(PROMPTS["farm"].format(n=n))
         return parse(text)
 
     async def sources(self, n: int = 10) -> list[str]:
-        """URL sumber yang diusulkan model."""
+        """Source URLs proposed by the model."""
         text = await self.chat(PROMPTS["sources"].format(n=n))
         urls = re.findall(r"https?://[^\s'\"<>)\]},]+", text)
         clean = []
@@ -130,7 +130,7 @@ class AI:
         return clean
 
     async def review(self, rows: list[dict], n: int = 25) -> list[str]:
-        """Minta model memilih subset terbaik dari hasil uji nyata."""
+        """Ask the model to pick the best subset of real test results."""
         trimmed = [
             {k: r.get(k) for k in ("proxy", "exit_ip", "scheme", "latency_ms", "anon")}
             for r in rows[:200]
@@ -144,11 +144,11 @@ class AI:
         return [p for p in chosen if p in known]
 
     async def ping(self) -> str:
-        return await self.chat("Balas tepat satu kata: siap", temperature=0)
+        return await self.chat("Reply with exactly one word: ready", temperature=0)
 
 
 def _extract_proxy_list(text: str) -> list[str]:
-    """Ambil nilai proxy dari balasan JSON model, toleran terhadap sampah."""
+    """Extract proxy values from the model reply, tolerant of junk."""
     m = re.search(r"\[[\s\S]*\]", text)
     if m:
         try:

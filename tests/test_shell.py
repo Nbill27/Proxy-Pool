@@ -1,7 +1,7 @@
-"""Uji helper parsing argumen di shell: flag bernilai vs flag saklar."""
+"""Shell argument parsing tests: valued flags vs switches."""
 from __future__ import annotations
 
-from ppp import shell
+from pp import shell
 
 
 def test_switch_detects_trailing_flag():

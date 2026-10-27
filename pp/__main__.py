@@ -1,4 +1,4 @@
-"""Entry point paket: jalankan `python -m ppp`."""
+"""Package entry point: run `python -m pp`."""
 from __future__ import annotations
 
 import asyncio

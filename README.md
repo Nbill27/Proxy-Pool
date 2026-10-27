@@ -1,107 +1,114 @@
-# ppp — proxy pool terminal
+# Proxy Pool (PP)
 
-Scraper proxy publik + penguji hidup/mati, dibungkus shell interaktif. Semua output
-bahasa Indonesia, semua state disimpan sebagai file JSON/TXT di folder ini.
+Public proxy scraper + liveness tester, wrapped in an interactive shell. Every state
+file lives in this folder as JSON/TXT.
 
 ```
-python cli.py            # mode interaktif (REPL)
-python cli.py harvest    # sekali jalan
+python cli.py            # interactive mode (REPL)
+python cli.py harvest    # one-shot
 ```
 
 ---
 
-## 1. Pasang
+## 1. Install
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Butuh Python 3.10+. Dependensi runtime cuma `aiohttp`; sisanya stdlib.
+Python 3.10+. The only runtime dependency is `aiohttp`; everything else is stdlib.
+
+Optional, to get the `pp` command on your PATH:
+
+```bash
+pip install -e .
+```
 
 ---
 
-## 2. Mulai cepat
+## 2. Quick start
 
 ```bash
 python cli.py
 ```
 
 ```
-ppp> harvest
-ppp> test --limit 300 --c 200
-ppp> pool --limit 20
-ppp> export env
+pp> harvest
+pp> test --limit 300 --c 200
+pp> pool --limit 20
+pp> export env
 ```
 
-Urutannya: **kumpulkan kandidat → uji hidup → simpan pool → export**.
-`harvest` mengisi `candidates.txt`, `test` menulis `proxies.json`, `export` menyalin
-pool ke format yang bisa langsung dipakai.
+The order is always: **collect candidates → test liveness → save pool → export**.
+`harvest` fills `candidates.txt`, `test` writes `proxies.json`, `export` copies the
+pool into a format you can use right away.
 
-Kalau sumber mati atau kandidat kosong, jalankan `doctor` dulu — dia cek dependensi,
-koneksi keluar, dan keberadaan file state.
+If sources are down or candidates are empty, run `doctor` first — it checks
+dependencies, the outbound connection, and the state files.
 
 ---
 
-## 3. Perintah
+## 3. Commands
 
-| perintah | arti |
+| command | meaning |
 |---|---|
-| `status` | ringkasan kandidat, pool, jumlah sumber, status AI |
-| `harvest [--timeout N]` | scrape semua sumber → `candidates.txt` |
-| `import <ip:port ...>` | masukkan proxy manual (spasi/koma/newline bebas) |
-| `import file <path>` | baca daftar dari file lokal |
-| `import url <url>` | ambil daftar dari satu URL |
-| `import paste` | tempel multiline, akhiri dengan baris berisi `.` |
-| `test [--limit N] [--src cand\|pool] [--c N] [--timeout N]` | uji hidup → `proxies.json` |
-| `pool [--sort lat\|ip] [--limit N]` | lihat isi pool (default sort `lat`, limit 40) |
-| `export <json\|txt\|csv\|env> [path]` | simpan salinan pool |
-| `check <ip:port> [--timeout N]` | uji satu proxy sekarang, tampilkan detail |
-| `source list` | daftar URL sumber |
-| `source add <url> [raw\|html]` | tambah sumber |
-| `source rm <url>` | hapus sumber |
-| `ai status` \| `ai ping` | kondisi lane AI / tes koneksi model |
-| `ai farm [n] [--test]` | minta kandidat dari model (opsional langsung diuji) |
-| `ai sources [n]` | minta URL sumber baru dari model |
-| `ai review [n]` | minta model memilah pool yang sudah ada |
-| `config` | tampilkan config (api_key disensor) |
-| `config <key> <value>` | ubah config |
-| `doctor` | diagnosa dependensi, koneksi, file |
-| `clear` \| `help` \| `exit` | bersihkan layar / bantuan / keluar |
+| `status` | summary of candidates, pool, source count, AI status |
+| `harvest [--timeout N]` | scrape every source → `candidates.txt` |
+| `import <ip:port ...>` | add proxies manually (spaces/commas/newlines allowed) |
+| `import file <path>` | read a list from a local file |
+| `import url <url>` | fetch a list from a single URL |
+| `import paste` | paste multiline, finish with a line containing `.` |
+| `test [--limit N] [--src cand\|pool] [--c N] [--timeout N]` | test liveness → `proxies.json` |
+| `pool [--sort lat\|ip] [--limit N]` | show the pool (default sort `lat`, limit 40) |
+| `export <json\|txt\|csv\|env> [path]` | save a copy of the pool |
+| `check <ip:port> [--timeout N]` | test one proxy now, show details |
+| `source list` | list source URLs |
+| `source add <url> [raw\|html]` | add a source |
+| `source rm <url>` | remove a source |
+| `ai status` \| `ai ping` | AI lane status / test the model connection |
+| `ai farm [n] [--test]` | ask the model for candidates (optionally test them) |
+| `ai sources [n]` | ask the model for new source URLs |
+| `ai review [n]` | ask the model to rank the existing pool |
+| `config` | show config (api_key masked) |
+| `config <key> <value>` | change config |
+| `doctor` | diagnose dependencies, connection, files |
+| `clear` \| `help` \| `exit` | clear screen / help / quit |
 
-Ctrl+C membatalkan baris, Ctrl+D keluar. Panah atas/bawah = riwayat kalau `readline`
-tersedia.
-
----
-
-## 4. Catatan pemakaian
-
-- `harvest` selalu menyimpan ke `candidates.txt`. Dedup otomatis, jadi harvest berulang aman.
-- `test` default menguji kandidat (`--src cand`). Pakai `--src pool` untuk menguji ulang
-  isi pool, berguna membuang yang sudah mati.
-- `test` menggabungkan hasil, bukan menimpa: proxy yang sudah ada di pool dipertahankan
-  kalau latensi barunya sama atau lebih baik.
-- `export` tanpa path menulis ke `pool-<YYYYmmdd-HHMMSS>.<fmt>` di folder ini.
-- `export env` menghasilkan `export HTTP_PROXY=...` plus komentar `# alt1..alt19`.
-- `pool --sort lat` (default) urut dari tercepat; `--sort ip` urut leksikografis.
-- Entri boleh ditulis bebas: `http://1.2.3.4:8080`, `1.2.3.4 8080`, atau `1.2.3.4:8080`
-  semuanya diterima. Alamat privat dan reserved otomatis dibuang.
-- Proxy transparan — yang meneruskan IP asli kamu — tidak disimpan.
+Ctrl+C cancels the current line, Ctrl+D quits. Up/down arrows walk the history when
+`readline` is available.
 
 ---
 
-## 5. Lane AI
+## 4. Usage notes
 
-AI di sini **OpenAI-compatible** — satu klien, banyak provider. Yang dibutuhkan cuma
-`base_url`, `api_key`, `model`.
+- `harvest` always saves to `candidates.txt`. Dedup happens on write, so repeated
+  harvests are safe.
+- `test` reads candidates by default (`--src cand`). Use `--src pool` to re-test the
+  pool, which is handy for dropping dead entries.
+- `test` merges results instead of overwriting: an existing pool entry is kept unless
+  the new latency is better.
+- `export` without a path writes `pool-<YYYYmmdd-HHMMSS>.<fmt>` in this folder.
+- `export env` emits `export HTTP_PROXY=...` plus `# alt1..alt19` comments.
+- `pool --sort lat` (default) goes fastest first; `--sort ip` sorts lexicographically.
+- Entries can be written loosely: `http://1.2.3.4:8080`, `1.2.3.4 8080`, and
+  `1.2.3.4:8080` are all accepted. Private and reserved addresses are dropped.
+- Transparent proxies — the ones that leak your real IP — are never stored.
+
+---
+
+## 5. AI lane
+
+The AI here is **OpenAI-compatible** — one client, many providers. All it needs is
+`base_url`, `api_key`, and `model`.
 
 ```bash
-ppp> config ai.base_url https://api.openai.com/v1
-ppp> config ai.api_key sk-...
-ppp> config ai.model gpt-4o-mini
-ppp> ai ping
+pp> config ai.base_url https://api.openai.com/v1
+pp> config ai.api_key sk-...
+pp> config ai.model gpt-4o-mini
+pp> ai ping
 ```
 
-Provider lain:
+Other providers:
 
 ```bash
 # Groq
@@ -112,97 +119,98 @@ config ai.model llama-3.3-70b-versatile
 config ai.base_url https://openrouter.ai/api/v1
 config ai.model anthropic/claude-3.5-sonnet
 
-# Ollama (lokal, tanpa key)
+# Ollama (local, no key)
 config ai.base_url http://localhost:11434/v1
 config ai.api_key ollama-local
 config ai.model llama3.1
 
-# LM Studio (lokal)
+# LM Studio (local)
 config ai.base_url http://localhost:1234/v1
 config ai.api_key lmstudio
 config ai.model local-model
 ```
 
-Menyetel salah satu key `ai.*` otomatis menyalakan `ai.enabled`. Matikan dengan
-`config ai.enabled false`. Kosongkan nilai dengan `-`:
+Setting any `ai.*` key turns `ai.enabled` on automatically. Turn it off with
+`config ai.enabled false`. Clear a value with `-`:
 
 ```bash
-config ai.api_key -        # hapus key
+config ai.api_key -        # remove the key
 ```
 
-Yang paling berguna:
+What is actually useful:
 
-1. **`ai sources`** — usulan URL sumber baru untuk ditambahkan lewat `source add`.
-2. **`ai review`** — memilah pool nyata: memberi label anonimitas dan mengurutkan mana
-   yang layak dipakai.
-3. **`ai farm --test`** — kandidat dari model, langsung diuji.
+1. **`ai sources`** — proposed source URLs to add with `source add`.
+2. **`ai review`** — ranks the real pool and labels anonymity.
+3. **`ai farm --test`** — candidates from the model, tested immediately.
 
-Kandidat dari model tidak dipercaya begitu saja: semuanya masuk antrean uji yang sama
-dengan hasil scrape sebelum menyentuh `proxies.json`. Kalau AI gagal, dia melaporkan
-gagal.
+Candidates from the model are not trusted as-is: they go through the same test queue
+as scraped ones before touching `proxies.json`. If the AI fails, it reports a failure.
 
 ---
 
-## 6. Arti hasil uji
+## 6. Test result fields
 
-Tiap proxy yang lolos punya lima kolom:
+Every proxy that survives has five fields:
 
-| kolom | arti |
+| field | meaning |
 |---|---|
-| `proxy` | alamat `ip:port` |
-| `exit_ip` | IP yang dilihat server tujuan |
-| `scheme` | `https` kalau jalur TLS lewat proxy berhasil, `http` kalau cuma fallback |
-| `latency_ms` | waktu total request lewat proxy |
-| `anon` | `elite` kalau tidak ada header bocor; `anonymous` kalau ada `x-forwarded-for`, `x-real-ip`, `via`, atau `forwarded` |
+| `proxy` | the `ip:port` address |
+| `exit_ip` | the IP the target server sees |
+| `scheme` | `https` if TLS through the proxy worked, `http` if only the fallback did |
+| `latency_ms` | total request time through the proxy |
+| `anon` | `elite` when no header leaks; `anonymous` when `x-forwarded-for`, `x-real-ip`, `via`, or `forwarded` shows up |
 
-Proxy dianggap hidup kalau request lewat proxy berhasil dan responsnya masuk akal.
-Yang mati atau transparan tidak masuk pool.
+A proxy counts as alive when a request through it succeeds and the response looks
+sane. Dead or transparent proxies never enter the pool.
 
 ---
 
-## 7. Isi folder
+## 7. Folder contents
 
-| file | isi |
+| file | contents |
 |---|---|
-| `cli.py` | entry point; tanpa argumen = REPL, dengan argumen = sekali jalan |
-| `ppp/engine.py` | scrape, parse, uji proxy |
-| `ppp/store.py` | config, sumber, kandidat, pool, export |
-| `ppp/ai.py` | klien AI + lane farm/sources/review |
-| `ppp/shell.py` | REPL dan handler perintah |
-| `ppp/ui.py` | warna, tabel, banner, progress bar |
-| `config.json` | config aktif (dibuat otomatis) |
-| `sources.json` | daftar URL sumber (dibuat otomatis) |
-| `candidates.txt` | kandidat `ip:port`, satu per baris |
-| `proxies.json` | pool hidup |
-| `config.json.example` | contoh config untuk disalin |
+| `cli.py` | entry point; no arguments = REPL, with arguments = one-shot |
+| `pp/engine.py` | scrape, parse, test proxies |
+| `pp/store.py` | config, sources, candidates, pool, export |
+| `pp/ai.py` | AI client + farm/sources/review lanes |
+| `pp/shell.py` | REPL and command handlers |
+| `pp/ui.py` | colors, tables, banner, progress bar |
+| `config.json` | active config (created automatically) |
+| `sources.json` | source URL list (created automatically) |
+| `candidates.txt` | `ip:port` candidates, one per line |
+| `proxies.json` | live pool |
+| `config.json.example` | sample config to copy |
 
-`config.json` dan `sources.json` menyembuhkan diri: kalau hilang atau rusak, default
-ditanam ulang saat pertama dibaca. Hapus `sources.json` kalau ingin balik ke daftar
-sumber bawaan.
+`config.json` and `sources.json` are self-healing: if they go missing or get corrupted,
+the defaults are written back on first read. Delete `sources.json` to return to the
+built-in source list.
 
-Warna mengikuti `NO_COLOR` — set variabel itu kalau pipe ke file atau log.
+Data lives in this folder when running from source, or in `~/.pp` when installed as a
+package. Override it with `PP_HOME`.
+
+Colors follow `NO_COLOR` — set that variable when piping to a file or a log.
 
 ---
 
-## 8. Kalau macet
+## 8. Troubleshooting
 
-**`harvest` dapat 0 kandidat** — jalankan `source list`, cek jumlahnya. Sumber publik
-mati dan hidup bergiliran; matikan yang mati dengan `source rm <url>`.
+**`harvest` returns 0 candidates** — run `source list` and check the count. Public
+sources come and go; remove the dead ones with `source rm <url>`.
 
-**Semua hasil uji mati** — biasanya bukan proxy-nya, tapi jalur keluar kamu. Cek
-`doctor`. `test` juga menampilkan IP asli kamu di pesan gagal; kalau itu `?`, masalahnya
-di koneksi, bukan di proxy.
+**Every test comes back dead** — it is usually your outbound path, not the proxies.
+Run `doctor`. `test` also prints your real IP in the failure message; if that is `?`,
+the problem is the connection, not the proxy.
 
-**`ai ping` gagal `ClientConnectorError`** — `base_url` menunjuk ke tempat yang tidak
-ada. Untuk Ollama pastikan `ollama serve` jalan dan port-nya 11434.
+**`ai ping` fails with `ClientConnectorError`** — `base_url` points somewhere that does
+not exist. For Ollama, make sure `ollama serve` is running on port 11434.
 
-**`ai ping` gagal 401** — api_key salah atau kosong. Untuk provider lokal, key apa pun
-diterima asal tidak kosong.
+**`ai ping` fails with 401** — wrong or empty api_key. Local providers accept any
+non-empty key.
 
-**Terminal berantakan setelah Ctrl+C** — `clear`.
+**The terminal looks messy after Ctrl+C** — `clear`.
 
-**Muncul `ConnectionResetError` / `WinError 10054` saat `test`** — proxy menutup koneksi
-paksa. Tidak berbahaya, uji tetap berjalan.
+**`ConnectionResetError` / `WinError 10054` shows up during `test`** — a proxy closed
+the connection abruptly. Harmless; the test keeps running.
 
-**Uji terasa lambat** — proxy mati menunggu sampai timeout. Turunkan `--timeout` atau
-`--c` kalau jaringan sedang goyang.
+**Testing feels slow** — dead proxies wait for the timeout. Lower `--timeout` or `--c`
+when the network is shaky.

@@ -1,4 +1,4 @@
-"""Tampilan terminal: warna ANSI, banner, tabel, progress. Semua stdlib."""
+"""Terminal display: ANSI colors, banner, tables, progress. Stdlib only."""
 from __future__ import annotations
 
 import os
@@ -6,13 +6,13 @@ import shutil
 import sys
 import time
 
-# konsol windows default cp1252 -- paksa utf-8 supaya karakter box tidak pecah
+# windows console defaults to cp1252 -- force utf-8 so box glyphs do not break
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
 
-# ---------------------------------------------------------------- warna
+# ---------------------------------------------------------------- colors
 _ENABLE = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 
 
@@ -31,7 +31,7 @@ CYAN = _c("38;5;80")
 GREY = _c("38;5;244")
 GREY2 = _c("38;5;239")
 
-# glyph P (ANSI shadow) -- dibangun dari satu sumber supaya tidak ada huruf yang kepotong
+# P glyph (ANSI shadow) -- built from a single source so no letter gets cut
 _P_GLYPH = [
     "\u2588\u2588\u2588\u2588\u2588\u2588\u2557 ",
     "\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557",
@@ -63,7 +63,7 @@ def width(default: int = 78) -> int:
 
 
 def _cls() -> None:
-    """Bersihkan layar saja, tanpa menggambar apa pun."""
+    """Clear the screen only, without drawing anything."""
     if _ENABLE:
         sys.stdout.write("\033[2J\033[H")
     else:
@@ -93,9 +93,9 @@ def banner(sub: str = "") -> None:
         print()
 
 
-# ---------------------------------------------------------------- pesan
+# ---------------------------------------------------------------- messages
 def clear() -> None:
-    """Bersihkan layar, lalu gambar ulang banner."""
+    """Clear the screen, then redraw the banner."""
     _cls()
     banner()
 
@@ -113,7 +113,7 @@ def warn(msg: str) -> None:
 
 
 def err(msg: str) -> None:
-    print(f"  {RED}gagal{RESET} {msg}")
+    print(f"  {RED}fail{RESET} {msg}")
 
 
 def note(msg: str) -> None:
@@ -128,7 +128,7 @@ def label(text: str) -> None:
     print(f"{BOLD}{CYAN}{text}{RESET}")
 
 
-# ---------------------------------------------------------------- tabel
+# ---------------------------------------------------------------- table
 def _fit(cells: list[str], widths: list[int]) -> list[str]:
     out_cells = []
     for cell, w in zip(cells, widths, strict=False):
@@ -140,9 +140,9 @@ def _fit(cells: list[str], widths: list[int]) -> list[str]:
 
 
 def table(headers: list[str], rows: list[list[str]], colorize=None, max_rows: int = 0) -> None:
-    """Tabel teks polos dengan garis tipis. Tidak butuh rich."""
+    """Plain text table with thin borders. No rich needed."""
     if not rows:
-        note("(kosong)")
+        note("(empty)")
         return
     cols = len(headers)
     all_rows = [[str(c) for c in r] + [""] * (cols - len(r)) for r in rows]
@@ -168,7 +168,7 @@ def table(headers: list[str], rows: list[list[str]], colorize=None, max_rows: in
         print(f"{GREY2}|{RESET} " + f" {GREY2}|{RESET} ".join(painted) + f" {GREY2}|{RESET}")
     print(f"{GREY2}+{'+'.join('-' * (w + 2) for w in widths)}+{RESET}")
     if max_rows and len(all_rows) > max_rows:
-        note(f"... {len(all_rows) - max_rows} baris lagi disembunyikan")
+        note(f"... {len(all_rows) - max_rows} more rows hidden")
 
 
 def _strip(s: str) -> str:
@@ -179,7 +179,7 @@ def _strip(s: str) -> str:
 
 # ---------------------------------------------------------------- progress
 class Bar:
-    """Progress bar satu baris, ditimpa tiap update."""
+    """Single-line progress bar, overwritten on every update."""
 
     def __init__(self, total: int, prefix: str = ""):
         self.total = max(1, total)

@@ -1,9 +1,9 @@
-"""Uji parser engine: regex, filter IP privat, input manual."""
+"""Engine parser tests: regex, private IP filter, manual input."""
 from __future__ import annotations
 
 import pytest
 
-from ppp import engine
+from pp import engine
 
 
 @pytest.mark.parametrize(
@@ -104,7 +104,7 @@ def test_sample_respects_limit():
 
 def test_summarize_empty():
     s = engine.summarize([])
-    assert s["hidup"] == 0
+    assert s["alive"] == 0
 
 
 def test_summarize_basic():
@@ -113,7 +113,7 @@ def test_summarize_basic():
         {"proxy": "1.1.1.1:3128", "scheme": "http", "anon": "anonymous", "latency_ms": 300},
     ]
     s = engine.summarize(rows)
-    assert s["hidup"] == 2
+    assert s["alive"] == 2
     assert s["https"] == 1
     assert s["elite"] == 1
     assert s["median_ms"] in (100, 300)

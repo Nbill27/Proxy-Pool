@@ -6,7 +6,7 @@ pool-*.json
 pool-*.txt
 pool-*.csv
 pool-*.env
-.ppp_history
+.pp_history
 
 # python
 __pycache__/

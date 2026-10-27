@@ -1,11 +1,11 @@
-"""Uji penyimpanan: urutan kandidat, merge pool, dan semua format export."""
+"""Storage tests: candidate order, pool merge, and every export format."""
 from __future__ import annotations
 
 import json
 
 import pytest
 
-from ppp import store
+from pp import store
 
 
 @pytest.fixture
@@ -112,7 +112,7 @@ def test_export_env(sandbox):
 
 def test_export_env_empty(sandbox):
     path = store.export_pool("env", [], sandbox / "out.env")
-    assert path.read_text(encoding="utf-8").strip() == "# kosong"
+    assert path.read_text(encoding="utf-8").strip() == "# empty"
 
 
 def test_export_unknown_format(sandbox):

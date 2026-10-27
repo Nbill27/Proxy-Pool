@@ -1,4 +1,4 @@
-"""REPL interaktif: shell kecil untuk scrape, uji, dan kelola pool."""
+"""Interactive REPL: a small shell to scrape, test, and manage the pool."""
 from __future__ import annotations
 
 import asyncio
@@ -10,30 +10,31 @@ import aiohttp
 from . import ai as ai_mod
 from . import engine, store, ui
 
-PROMPT = f"\001{ui.GREEN}\002ppp\001{ui.RESET}\002{ui.GREY}>\001{ui.RESET}\002 "
+PROMPT = f"\001{ui.GREEN}\002pp\001{ui.RESET}\002{ui.GREY}>\001{ui.RESET}\002 "
 
 HELP = [
-    ("status", "ringkasan kandidat, pool, sumber, config AI"),
-    ("harvest", "scrape semua sumber -> candidates.txt    [--timeout N]"),
-    ("import", "masukkan proxy manual: import <teks> | import file <path> | import url <url>"),
-    ("test", "uji kandidat/pool -> proxies.json    [--limit N] [--src pool|cand] [--c N]"),
-    ("pool", "lihat isi pool    [--sort lat|ip] [--limit N]"),
-    ("export", "simpan pool ke file    export <json|txt|csv|env> [path]"),
-    ("check", "uji satu proxy sekarang    check <ip:port>"),
-    ("source", "kelola sumber    source list | source add <url> [raw|html] | source rm <url>"),
-    ("ai", "lane AI    ai farm [n] | ai sources [n] | ai review [n] | ai ping | ai status"),
-    ("config", "lihat/ubah config    config | config <key> <value>"),
-    ("doctor", "cek dependensi, koneksi, file"),
-    ("clear", "bersihkan layar"),
-    ("help", "daftar perintah"),
-    ("exit", "keluar"),
+    ("status", "summary of candidates, pool, sources, AI config"),
+    ("harvest", "scrape all sources -> candidates.txt    [--timeout N]"),
+    ("import", "add proxies manually: import <text> | import file <path> | import url <url>"),
+    ("test", "test candidates/pool -> proxies.json    [--limit N] [--src pool|cand] [--c N]"),
+    ("pool", "show pool contents    [--sort lat|ip] [--limit N]"),
+    ("export", "save pool to a file    export <json|txt|csv|env> [path]"),
+    ("check", "test one proxy now    check <ip:port>"),
+    ("source", "manage sources    source list | source add <url> [raw|html] | source rm <url>"),
+    ("ai", "AI lane    ai farm [n] | ai sources [n] | ai review [n] | ai ping | ai status"),
+    ("config", "view/change config    config | config <key> <value>"),
+    ("doctor", "check dependencies, connection, files"),
+    ("clear", "clear the screen"),
+    ("help", "command list"),
+    ("exit", "quit"),
 ]
 
+
 def _bool(v: str) -> bool:
-    return str(v).strip().lower() in ("1", "true", "yes", "y", "on", "siap", "nyala")
+    return str(v).strip().lower() in ("1", "true", "yes", "y", "on")
 
 
-KONFIG_MAP = {
+CONFIG_MAP = {
     "concurrency": ("concurrency", int),
     "timeout": ("timeout", int),
     "ai.enabled": ("ai.enabled", _bool),
@@ -55,17 +56,17 @@ def _flag(args: list[str], name: str, default=None):
 
 
 def _switch(args: list[str], name: str) -> bool:
-    """Flag tanpa nilai, mis. --test di akhir baris."""
+    """Valueless flag, e.g. --test at the end of a line."""
     return name in args
 
 
 def _pos(args: list[str], skip: int = 0) -> list[str]:
-    """Argumen posisional (buang yang berawalan -- atau nilai flag)."""
+    """Positional arguments (drop anything starting with -- or a flag value)."""
     out, i = [], 0
     while i < len(args):
         a = args[i]
         if a.startswith("--"):
-            # flag bernilai tunggal -> lewati nilainya
+            # single-value flag -> skip its value
             if i + 1 < len(args) and not args[i + 1].startswith("--"):
                 i += 2
                 continue
@@ -77,14 +78,14 @@ def _pos(args: list[str], skip: int = 0) -> list[str]:
 
 
 def _print_help() -> None:
-    ui.label("perintah")
+    ui.label("commands")
     for cmd, desc in HELP:
         print(f"  {ui.CYAN}{cmd:<9}{ui.RESET}{ui.GREY}{desc}{ui.RESET}")
     print()
-    ui.note("panah atas/bawah = riwayat (kalau readline tersedia), ctrl+c = batal, ctrl+d = keluar")
+    ui.note("up/down arrows = history (if readline is available), ctrl+c = cancel, ctrl+d = quit")
 
 
-# ---------------------------------------------------------------- perintah
+# ---------------------------------------------------------------- commands
 class Shell:
     def __init__(self) -> None:
         self.cfg = store.load_config()
@@ -93,7 +94,7 @@ class Shell:
 
     # -------------------------------------------------------- loop
     async def run(self) -> None:
-        ui.banner(f"selamat datang. ketik {ui.CYAN}help{ui.RESET} untuk mulai.")
+        ui.banner(f"welcome. type {ui.CYAN}help{ui.RESET} to start.")
         store.load_sources()
         while self.running:
             try:
@@ -108,10 +109,10 @@ class Shell:
                 await self.dispatch(line)
             except KeyboardInterrupt:
                 print()
-                ui.warn("dibatalkan")
+                ui.warn("cancelled")
             except Exception as e:
                 ui.err(f"{type(e).__name__}: {e}")
-        ui.note("sampai jumpa.")
+        ui.note("see you.")
 
     async def dispatch(self, line: str) -> None:
         try:
@@ -124,8 +125,8 @@ class Shell:
 
         handler = getattr(self, f"cmd_{cmd}", None)
         if handler is None:
-            ui.err(f"perintah tidak dikenal: {cmd}")
-            ui.note("ketik help")
+            ui.err(f"unknown command: {cmd}")
+            ui.note("type help")
             return
         result = handler(args)
         if asyncio.iscoroutine(result):
@@ -147,10 +148,10 @@ class Shell:
         ai = ai_mod.AI(self.cfg)
         ui.rule("status")
         ui.kv_table({
-            "kandidat": f"{st['kandidat']} entri  ({store.CANDIDATES_FILE.name})",
-            "pool hidup": f"{st['pool']}  (https {st['https']}, elite {st['elite']})",
+            "candidates": f"{st['candidates']} entries  ({store.CANDIDATES_FILE.name})",
+            "live pool": f"{st['pool']}  (https {st['https']}, elite {st['elite']})",
             "median latency": f"{st['median_ms']} ms" if st["pool"] else "-",
-            "sumber": f"{st['sumber']} url",
+            "sources": f"{st['sources']} url",
             "concurrency": self.cfg.get("concurrency"),
             "timeout": f"{self.cfg.get('timeout')} s",
             "ai": f"{ai.describe()['status']}  ({ai.model})",
@@ -159,20 +160,20 @@ class Shell:
         if pu:
             import time
 
-            ui.note(f"pool terakhir disimpan: {time.strftime('%Y-%m-%d %H:%M', time.localtime(pu))}")
+            ui.note(f"pool last saved: {time.strftime('%Y-%m-%d %H:%M', time.localtime(pu))}")
         print()
 
-    # -------------------------------------------------------- sumber
+    # -------------------------------------------------------- sources
     def cmd_source(self, args):
         pos = _pos(args)
         sub = pos[0] if pos else "list"
         data = store.load_sources()
 
         if sub == "list":
-            ui.rule("sumber raw")
+            ui.rule("raw sources")
             for u in data["raw"]:
                 print(f"  {ui.GREY}-{ui.RESET} {u}")
-            ui.rule("sumber html")
+            ui.rule("html sources")
             for u in data["html"]:
                 print(f"  {ui.GREY}-{ui.RESET} {u}")
             print()
@@ -181,26 +182,26 @@ class Shell:
 
         if sub == "add":
             if len(pos) < 2:
-                ui.err("pakai: source add <url> [raw|html]")
+                ui.err("usage: source add <url> [raw|html]")
                 return
             url = pos[1]
             kind = pos[2] if len(pos) > 2 else "raw"
             if not url.startswith("http"):
-                ui.err("url harus http(s)://")
+                ui.err("url must be http(s)://")
                 return
             if store.add_source(url, kind):
-                ui.ok(f"ditambahkan ke {kind}: {url}")
+                ui.ok(f"added to {kind}: {url}")
             else:
-                ui.warn("sudah ada")
+                ui.warn("already exists")
 
         elif sub in ("rm", "remove", "del"):
             if len(pos) < 2:
-                ui.err("pakai: source rm <url>")
+                ui.err("usage: source rm <url>")
                 return
             if store.remove_source(pos[1]):
-                ui.ok(f"dihapus: {pos[1]}")
+                ui.ok(f"removed: {pos[1]}")
             else:
-                ui.err("tidak ditemukan")
+                ui.err("not found")
         else:
             ui.err("subcommand: list | add | rm")
 
@@ -219,18 +220,18 @@ class Shell:
 
         cands = res["candidates"]
         if not cands:
-            ui.warn("tidak ada kandidat. cek sumber: source list")
+            ui.warn("no candidates. check sources: source list")
             return
 
         total, new = store.add_candidates(cands)
-        ui.ok(f"kandidat unik: {len(cands)}, baru: {new}, total file: {total}")
+        ui.ok(f"unique candidates: {len(cands)}, new: {new}, total file: {total}")
         ui.note(f"-> {store.CANDIDATES_FILE}")
 
     # -------------------------------------------------------- import
     async def cmd_import(self, args):
         pos = _pos(args)
         if not pos:
-            ui.warn("pakai: import <ip:port ...> | import file <path> | import url <url>")
+            ui.warn("usage: import <ip:port ...> | import file <path> | import url <url>")
             return
 
         mode = pos[0].lower()
@@ -238,18 +239,18 @@ class Shell:
 
         if mode == "file":
             if len(pos) < 2:
-                ui.err("pakai: import file <path>")
+                ui.err("usage: import file <path>")
                 return
             p = Path(pos[1]).expanduser()
             if not p.exists():
-                ui.err(f"file tidak ada: {p}")
+                ui.err(f"file not found: {p}")
                 return
             items = engine.parse_lines(p.read_text(errors="ignore"))
-            ui.info(f"dibaca dari {p.name}")
+            ui.info(f"read from {p.name}")
 
         elif mode == "url":
             if len(pos) < 2:
-                ui.err("pakai: import url <url>")
+                ui.err("usage: import url <url>")
                 return
             url = pos[1]
             try:
@@ -264,7 +265,7 @@ class Shell:
                 return
 
         elif mode == "paste":
-            ui.note("tempel daftar proxy, akhiri dengan satu baris berisi titik (.)")
+            ui.note("paste the proxy list, finish with a single line containing a dot (.)")
             buf = []
             loop = asyncio.get_event_loop()
             while True:
@@ -278,12 +279,12 @@ class Shell:
             items = engine.parse_lines(" ".join(pos))
 
         if not items:
-            ui.warn("tidak ada entri ip:port yang valid")
+            ui.warn("no valid ip:port entries")
             return
 
         total, new = store.add_candidates(items)
-        ui.ok(f"valid: {len(items)}, baru: {new}, total file: {total}")
-        ui.note("lanjut: test --src cand --limit N")
+        ui.ok(f"valid: {len(items)}, new: {new}, total file: {total}")
+        ui.note("next: test --src cand --limit N")
 
     # -------------------------------------------------------- test
     async def cmd_test(self, args, only: list[str] | None = None):
@@ -294,55 +295,55 @@ class Shell:
 
         if only is not None:
             cands = list(dict.fromkeys(only))
-            label = "kandidat AI"
+            label = "AI candidates"
         elif src == "pool":
             pool = store.load_pool()
             cands = [r["proxy"] for r in pool]
             label = "pool"
         else:
             cands = store.load_candidates()
-            label = "kandidat"
+            label = "candidates"
 
         if not cands:
-            ui.warn(f"{label} kosong. jalankan harvest atau import dulu")
+            ui.warn(f"{label} is empty. run harvest or import first")
             return
 
         targets = cands if only is not None else engine.sample(cands, limit)
-        ui.rule(f"uji {len(targets)} {label}  concurrency {conc}  timeout {timeout}s")
+        ui.rule(f"testing {len(targets)} {label}  concurrency {conc}  timeout {timeout}s")
 
-        bar = ui.Bar(len(targets), prefix="uji")
+        bar = ui.Bar(len(targets), prefix="test")
 
         def on_progress(done, total, alive):
-            bar.update(done, extra=f"hidup {alive}")
+            bar.update(done, extra=f"alive {alive}")
 
         res = await engine.test_many(targets, conc, timeout, on_progress)
-        bar.update(len(targets), extra=f"hidup {len(res['alive'])}", force=True)
+        bar.update(len(targets), extra=f"alive {len(res['alive'])}", force=True)
 
         alive = res["alive"]
         if not alive:
-            ui.warn(f"tidak ada yang hidup (IP kamu: {res['my_ip'] or '?'})")
+            ui.warn(f"nothing alive (your IP: {res['my_ip'] or '?'})")
             return
 
         total_pool, added = store.merge_pool(alive)
         s = engine.summarize(alive)
         ui.ok(
-            f"hidup {s['hidup']}/{len(targets)}  https {s['https']}  elite {s['elite']}  "
+            f"alive {s['alive']}/{len(targets)}  https {s['https']}  elite {s['elite']}  "
             f"median {s['median_ms']}ms  ({res['elapsed']}s)"
         )
-        ui.note(f"tercepat: {s['tercepat']}")
-        ui.note(f"pool: +{added} baru -> {total_pool} total  ({store.POOL_FILE.name})")
+        ui.note(f"fastest: {s['fastest']}")
+        ui.note(f"pool: +{added} new -> {total_pool} total  ({store.POOL_FILE.name})")
 
     # -------------------------------------------------------- pool
     def cmd_pool(self, args):
         rows = store.load_pool()
         if not rows:
-            ui.warn("pool kosong. jalankan test dulu")
+            ui.warn("pool is empty. run test first")
             return
         limit = int(_flag(args, "--limit", 40))
         if _flag(args, "--sort", "lat") == "ip":
             rows = sorted(rows, key=lambda r: r.get("proxy", ""))
 
-        ui.rule(f"pool ({len(rows)} entri)")
+        ui.rule(f"pool ({len(rows)} entries)")
         ui.table(
             ["#", "proxy", "exit", "scheme", "ms", "anon"],
             [[str(i + 1), r["proxy"], r.get("exit_ip", "-"), r.get("scheme", "-"),
@@ -351,7 +352,7 @@ class Shell:
             max_rows=limit,
         )
         print()
-        ui.note("export <json|txt|csv|env> untuk menyimpan salinan")
+        ui.note("export <json|txt|csv|env> to save a copy")
 
     # -------------------------------------------------------- export
     def cmd_export(self, args):
@@ -359,7 +360,7 @@ class Shell:
         fmt = pos[0].lower() if pos else "txt"
         rows = store.load_pool()
         if not rows:
-            ui.warn("pool kosong, tidak ada yang diexport")
+            ui.warn("pool is empty, nothing to export")
             return
         target = Path(pos[1]) if len(pos) > 1 else None
         try:
@@ -367,28 +368,28 @@ class Shell:
         except ValueError as e:
             ui.err(str(e))
             return
-        ui.ok(f"{len(rows)} entri -> {p}")
+        ui.ok(f"{len(rows)} entries -> {p}")
 
     # -------------------------------------------------------- check
     async def cmd_check(self, args):
         pos = _pos(args)
         if not pos:
-            ui.err("pakai: check <ip:port>")
+            ui.err("usage: check <ip:port>")
             return
         proxy = pos[0]
         if not engine.parse(proxy):
-            ui.err(f"format tidak valid: {proxy}")
+            ui.err(f"invalid format: {proxy}")
             return
-        ui.info(f"menguji {proxy} ...")
+        ui.info(f"testing {proxy} ...")
         timeout = int(_flag(args, "--timeout", self.cfg.get("timeout", 8)))
         sem = asyncio.Semaphore(1)
         async with engine.make_session(8) as session:
             my_ip = await engine.real_ip(session)
             res = await engine.probe(session, proxy, sem, my_ip, timeout)
         if not res:
-            ui.warn(f"mati atau transparan (IP kamu {my_ip or '?'})")
+            ui.warn(f"dead or transparent (your IP {my_ip or '?'})")
             return
-        ui.ok("hidup")
+        ui.ok("alive")
         ui.kv_table(res)
 
     # -------------------------------------------------------- ai
@@ -402,77 +403,77 @@ class Shell:
             ui.kv_table(ai.describe())
             print()
             if not ai.ready:
-                ui.note("atasi: config ai.base_url <url> / config ai.api_key <key> / config ai.model <nama>")
-            ui.note("contoh lokal: config ai.base_url http://localhost:11434/v1  +  config ai.model llama3.1")
+                ui.note("fix: config ai.base_url <url> / config ai.api_key <key> / config ai.model <name>")
+            ui.note("local example: config ai.base_url http://localhost:11434/v1  +  config ai.model llama3.1")
             return
 
         if sub == "ping":
             try:
                 reply = await ai.ping()
-                ui.ok(f"model menjawab: {reply.strip()[:80]}")
+                ui.ok(f"model replied: {reply.strip()[:80]}")
             except ai_mod.AIError as e:
                 ui.err(str(e))
             return
 
         if not ai.ready:
-            ui.err("AI belum dikonfigurasi. jalankan: ai status")
+            ui.err("AI is not configured. run: ai status")
             return
 
         if sub == "farm":
             n = int(pos[1]) if len(pos) > 1 else 40
-            ui.info(f"minta {n} kandidat dari {ai.model} ...")
+            ui.info(f"requesting {n} candidates from {ai.model} ...")
             try:
                 cands = await ai.farm(n)
             except ai_mod.AIError as e:
                 ui.err(str(e))
                 return
             if not cands:
-                ui.warn("model tidak mengembalikan ip:port yang bisa diparse")
+                ui.warn("the model returned no parsable ip:port")
                 return
             total, new = store.add_candidates(cands)
-            ui.ok(f"kandidat AI: {len(cands)}, baru: {new}, total file: {total}")
-            ui.note("IP dari model sering karangan. validasi wajib: test --src cand --limit N")
+            ui.ok(f"AI candidates: {len(cands)}, new: {new}, total file: {total}")
+            ui.note("model IPs are often invented. validation required: test --src cand --limit N")
             if _switch(args, "--test"):
                 await self.cmd_test([], only=sorted(cands))
             return
 
         if sub in ("sources", "src"):
             n = int(pos[1]) if len(pos) > 1 else 10
-            ui.info("minta usulan sumber ...")
+            ui.info("requesting source suggestions ...")
             try:
                 urls = await ai.sources(n)
             except ai_mod.AIError as e:
                 ui.err(str(e))
                 return
             if not urls:
-                ui.warn("tidak ada URL yang bisa diparse")
+                ui.warn("no parsable URL")
                 return
-            ui.label("usulan sumber")
+            ui.label("source suggestions")
             for u in urls:
                 print(f"  {ui.CYAN}{u}{ui.RESET}")
             print()
-            ui.note("tambah yang masuk akal: source add <url> raw")
+            ui.note("add the sensible ones: source add <url> raw")
             return
 
         if sub == "review":
             rows = store.load_pool()
             if not rows:
-                ui.warn("pool kosong, tidak ada yang bisa direview")
+                ui.warn("pool is empty, nothing to review")
                 return
             n = int(pos[1]) if len(pos) > 1 else 25
-            ui.info(f"minta {ai.model} memilih {n} terbaik dari {len(rows)} ...")
+            ui.info(f"asking {ai.model} to pick {n} best of {len(rows)} ...")
             try:
                 chosen = await ai.review(rows, n)
             except ai_mod.AIError as e:
                 ui.err(str(e))
                 return
             if not chosen:
-                ui.warn("model tidak memilih apa pun")
+                ui.warn("the model picked nothing")
                 return
-            ui.ok(f"dipilih {len(chosen)}")
+            ui.ok(f"picked {len(chosen)}")
             ui.table(["proxy"], [[p] for p in chosen], max_rows=40)
             print()
-            ui.note("export txt untuk menyimpan hasil terpilih")
+            ui.note("export txt to save the selection")
             return
 
         ui.err("subcommand: status | ping | farm | sources | review")
@@ -493,31 +494,31 @@ class Shell:
             ui.kv_table(flat, key_w=20)
             print()
             ui.note(f"file: {store.config_path()}")
-            ui.note("ubah: config <key> <value>   (contoh: config timeout 12)")
+            ui.note("change: config <key> <value>   (example: config timeout 12)")
             return
 
         key = pos[0]
-        if key not in KONFIG_MAP:
-            ui.err(f"key tidak dikenal: {key}")
-            ui.note("pilihan: " + ", ".join(KONFIG_MAP))
+        if key not in CONFIG_MAP:
+            ui.err(f"unknown key: {key}")
+            ui.note("options: " + ", ".join(CONFIG_MAP))
             return
 
         if len(pos) < 2:
             value = cfg
-            for part in KONFIG_MAP[key][0].split("."):
+            for part in CONFIG_MAP[key][0].split("."):
                 value = value.get(part) if isinstance(value, dict) else None
             shown = ("***" + str(value)[-4:]) if key == "ai.api_key" and value else value
             print(f"  {key} = {shown}")
             return
 
         raw = " ".join(pos[1:])
-        path, caster = KONFIG_MAP[key]
-        if raw.strip() in ("-", "kosong", "clear", "hapus"):
+        path, caster = CONFIG_MAP[key]
+        if raw.strip() in ("-", "empty", "clear", "unset"):
             raw = ""
         try:
             value = caster(raw)
         except ValueError:
-            ui.err(f"nilai tidak valid untuk {key}: {raw}")
+            ui.err(f"invalid value for {key}: {raw}")
             return
 
         node = cfg
@@ -550,27 +551,27 @@ class Shell:
 
         checks.append(("config.json", store.CONFIG_FILE.exists(), str(store.CONFIG_FILE)))
         checks.append(("sources.json", store.SOURCES_FILE.exists(), f"{len(store.all_sources())} url"))
-        checks.append(("candidates.txt", store.CANDIDATES_FILE.exists(), f"{len(store.load_candidates())} entri"))
-        checks.append(("proxies.json", store.POOL_FILE.exists(), f"{len(store.load_pool())} entri"))
+        checks.append(("candidates.txt", store.CANDIDATES_FILE.exists(), f"{len(store.load_candidates())} entries"))
+        checks.append(("proxies.json", store.POOL_FILE.exists(), f"{len(store.load_pool())} entries"))
 
         ai = ai_mod.AI(self.cfg)
-        checks.append(("ai", ai.ready, ai.model if ai.ready else "belum dikonfigurasi"))
+        checks.append(("ai", ai.ready, ai.model if ai.ready else "not configured"))
 
-        # koneksi keluar
+        # outbound connection
         try:
             async with engine.make_session(4) as s:
                 ip = await engine.real_ip(s)
-            checks.append(("koneksi", bool(ip), f"IP publik {ip or '?'}"))
+            checks.append(("connection", bool(ip), f"public IP {ip or '?'}"))
         except Exception as e:
-            checks.append(("koneksi", False, type(e).__name__))
+            checks.append(("connection", False, type(e).__name__))
 
         for name, good, detail in checks:
-            mark = f"{ui.GREEN}ok{ui.RESET}  " if good else f"{ui.RED}gagal{ui.RESET}"
+            mark = f"{ui.GREEN}ok{ui.RESET}  " if good else f"{ui.RED}fail{ui.RESET}"
             print(f"  {mark} {ui.BOLD}{name:<14}{ui.RESET} {ui.GREY}{detail}{ui.RESET}")
         print()
 
         bad = [c for c in checks if not c[1]]
         if bad:
-            ui.warn(f"{len(bad)} masalah. perbaiki yang gagal dulu.")
+            ui.warn(f"{len(bad)} problems. fix the failing ones first.")
         else:
-            ui.ok("semua sehat.")
+            ui.ok("all healthy.")

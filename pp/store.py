@@ -1,4 +1,4 @@
-"""Penyimpanan: config, sumber, kandidat, pool, export."""
+"""Storage: config, sources, candidates, pool, export."""
 from __future__ import annotations
 
 import csv
@@ -9,21 +9,21 @@ from pathlib import Path
 
 
 def _is_source_tree(path: Path) -> bool:
-    """True kalau folder ini sumber proyek, bukan hasil instalasi pip."""
+    """True if this folder is the project source, not a pip install."""
     if any(part in ("site-packages", "dist-packages") for part in path.parts):
         return False
     return (path / "pyproject.toml").exists() or (path / "cli.py").exists()
 
 
 def _resolve_root() -> Path:
-    """Lokasi data: PPP_HOME > folder proyek > ~/.ppp (kalau di-install)."""
-    env = os.environ.get("PPP_HOME")
+    """Data location: PP_HOME > project folder > ~/.pp (when installed)."""
+    env = os.environ.get("PP_HOME")
     if env:
         return Path(env).expanduser().resolve()
     local = Path(__file__).resolve().parent.parent
     if _is_source_tree(local):
         return local
-    return Path.home() / ".ppp"
+    return Path.home() / ".pp"
 
 
 ROOT = _resolve_root()
@@ -33,7 +33,7 @@ CONFIG_FILE = ROOT / "config.json"
 SOURCES_FILE = ROOT / "sources.json"
 CANDIDATES_FILE = ROOT / "candidates.txt"
 POOL_FILE = ROOT / "proxies.json"
-HISTORY_FILE = ROOT / ".ppp_history"
+HISTORY_FILE = ROOT / ".pp_history"
 
 DEFAULT_SOURCES = {
     "raw": [
@@ -105,7 +105,7 @@ def config_path() -> Path:
     return CONFIG_FILE
 
 
-# ---------------------------------------------------------------- sumber
+# ---------------------------------------------------------------- sources
 def load_sources() -> dict:
     data = _read_json(SOURCES_FILE, None)
     if not isinstance(data, dict) or not data.get("raw") or not data.get("html"):
@@ -147,9 +147,9 @@ def all_sources() -> list[str]:
     return list(data["raw"]) + list(data["html"])
 
 
-# ---------------------------------------------------------------- kandidat
+# ---------------------------------------------------------------- candidates
 def _norm(entry: str) -> str:
-    """Normalisasi lewat parser engine (impor lambat untuk hindari siklus)."""
+    """Normalize through the engine parser (lazy import to avoid a cycle)."""
     from .engine import normalize
 
     return normalize(entry)
@@ -169,7 +169,7 @@ def load_candidates() -> list[str]:
 
 
 def save_candidates(items) -> int:
-    """Tulis kandidat tanpa mengubah urutan masuk (stabil antar run)."""
+    """Write candidates without changing insertion order (stable across runs)."""
     seen: set[str] = set()
     out: list[str] = []
     for raw in items:
@@ -183,7 +183,7 @@ def save_candidates(items) -> int:
 
 
 def add_candidates(items) -> tuple[int, int]:
-    """Tambahkan ke file kandidat, urutan lama dipertahankan. (total, baru)."""
+    """Append to the candidate file, old order preserved. (total, new)."""
     existing = load_candidates()
     seen = set(existing)
     fresh: list[str] = []
@@ -209,7 +209,7 @@ def save_pool(rows: list[dict]) -> int:
 
 
 def merge_pool(rows: list[dict]) -> tuple[int, int]:
-    """Gabung hasil uji ke pool lama, dedup per proxy. (total, baru)."""
+    """Merge test results into the existing pool, dedup per proxy. (total, new)."""
     old = {r["proxy"]: r for r in load_pool() if "proxy" in r}
     added = 0
     for r in rows:
@@ -219,7 +219,7 @@ def merge_pool(rows: list[dict]) -> tuple[int, int]:
         if p not in old:
             added += 1
         prev = old.get(p)
-        # simpan yang latency-nya lebih baik
+        # keep the entry with the better latency
         if prev is None or r.get("latency_ms", 99999) <= prev.get("latency_ms", 99999):
             old[p] = r
     total = save_pool(list(old.values()))
@@ -245,13 +245,13 @@ def export_pool(fmt: str, rows: list[dict], target: Path | None = None) -> Path:
                             r.get("latency_ms"), r.get("anon")])
     elif fmt in ("env", "sh", "bash"):
         if rows:
-            lines = ["# pool siap pakai", f"export HTTP_PROXY=http://{rows[0]['proxy']}"]
+            lines = ["# ready-to-use pool", f"export HTTP_PROXY=http://{rows[0]['proxy']}"]
             lines += [f"# alt{i}: http://{r['proxy']}" for i, r in enumerate(rows[1:20], 2)]
         else:
-            lines = ["# kosong"]
+            lines = ["# empty"]
         target.write_text("\n".join(lines) + "\n", encoding="utf-8")
     else:
-        raise ValueError(f"format tidak dikenal: {fmt}")
+        raise ValueError(f"unknown format: {fmt}")
 
     return target
 
@@ -260,10 +260,10 @@ def stats() -> dict:
     pool = load_pool()
     cands = load_candidates()
     return {
-        "kandidat": len(cands),
+        "candidates": len(cands),
         "pool": len(pool),
         "https": sum(1 for r in pool if r.get("scheme") == "https"),
         "elite": sum(1 for r in pool if r.get("anon") == "elite"),
         "median_ms": sorted(r.get("latency_ms", 0) for r in pool)[len(pool) // 2] if pool else 0,
-        "sumber": len(all_sources()),
+        "sources": len(all_sources()),
     }

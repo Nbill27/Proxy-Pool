@@ -1,4 +1,4 @@
-"""Jantung: parse, harvest, real_ip, probe, uji massal."""
+"""Core: parse, harvest, real_ip, probe, bulk testing."""
 from __future__ import annotations
 
 import asyncio
@@ -18,15 +18,15 @@ ROW_RE = re.compile(
     r"<td[^>]*>\s*((?:\d{1,3}\.){3}\d{1,3})\s*</td>\s*<td[^>]*>\s*(\d{2,5})\s*</td>",
     re.I | re.S,
 )
-# "1.2.3.4 8080" atau "1.2.3.4:8080" atau "1.2.3.4,8080"
+# "1.2.3.4 8080", "1.2.3.4:8080", or "1.2.3.4,8080"
 LOOSE_RE = re.compile(r"\b((?:\d{1,3}\.){3}\d{1,3})\s*[:\s,;|]\s*(\d{2,5})\b")
 # "http://", "socks5://", ...
 SCHEME_RE = re.compile(r"^\s*[a-z][a-z0-9+.\-]*://", re.I)
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ppp/2.0"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) pp/2.0"}
 
 
-#parse
+# parse
 def _valid(ip: str, port: str) -> bool:
     try:
         octets = [int(o) for o in ip.split(".")]
@@ -54,7 +54,7 @@ def _valid(ip: str, port: str) -> bool:
 
 
 def parse(text: str) -> set[str]:
-    """Ambil pasangan ip:port dari HTML tabel, teks mentah, atau list campur."""
+    """Pull ip:port pairs out of HTML tables, raw text, or mixed lists."""
     found = {f"{ip}:{port}" for ip, port in ROW_RE.findall(text)}
     found |= {f"{ip}:{port}" for ip, port in IP_PORT_RE.findall(text)}
     found |= {f"{ip}:{port}" for ip, port in LOOSE_RE.findall(text)}
@@ -67,7 +67,7 @@ def parse(text: str) -> set[str]:
 
 
 def parse_lines(text: str) -> set[str]:
-    """Parse input manual: satu entri per baris, toleran."""
+    """Parse manual input: one entry per line, tolerant."""
     out = set()
     for line in text.replace(",", "\n").replace(";", "\n").splitlines():
         line = line.strip()
@@ -78,10 +78,10 @@ def parse_lines(text: str) -> set[str]:
 
 
 def normalize(entry: str) -> str:
-    """Rapikan satu entri jadi ip:port; "" kalau tidak valid.
+    """Clean a single entry into ip:port; "" if invalid.
 
-    Menerima `http://1.2.3.4:8080`, `1.2.3.4 8080`, `1.2.3.4:8080/`, dan
-    membuang skema, path, serta entri privat/reserved.
+    Accepts `http://1.2.3.4:8080`, `1.2.3.4 8080`, `1.2.3.4:8080/`, and drops
+    schemes, paths, and private/reserved entries.
     """
     s = SCHEME_RE.sub("", (entry or "").strip())
     found = parse(s.split("/")[0])
@@ -90,11 +90,11 @@ def normalize(entry: str) -> str:
 
 # ---------------------------------------------------------------- session
 def quiet_loop(loop: asyncio.AbstractEventLoop) -> None:
-    """Redam noise Proactor Windows: proxy memutus koneksi -> WinError 10054.
+    """Silence Windows Proactor noise: a proxy drops the connection -> WinError 10054.
 
-    Callback `_call_connection_lost` tetap mencoba shutdown socket yang sudah
-    mati, lalu asyncio mencetak traceback. Itu bukan kegagalan probe -- error
-    lain tetap dilaporkan apa adanya.
+    The `_call_connection_lost` callback still tries to shut down an already dead
+    socket, and asyncio prints a traceback. That is not a probe failure -- other
+    errors are still reported as-is.
     """
     previous = loop.get_exception_handler()
 
@@ -116,7 +116,7 @@ def make_session(concurrency: int) -> aiohttp.ClientSession:
 
 # ---------------------------------------------------------------- harvest
 async def harvest(session: aiohttp.ClientSession, timeout: int, on_source=None) -> dict:
-    """Scrape semua sumber. Kembalikan {'candidates': set, 'report': [...]}"""
+    """Scrape every source. Returns {'candidates': set, 'report': [...]}"""
     urls = store.all_sources()
     candidates: set[str] = set()
     report = []
@@ -156,7 +156,7 @@ async def real_ip(session: aiohttp.ClientSession) -> str:
 
 
 async def probe(session, proxy: str, sem: asyncio.Semaphore, my_ip: str, timeout: int):
-    """Satu percobaan request lewat proxy. None kalau mati/transparent."""
+    """One request attempt through a proxy. None if dead or transparent."""
     async with sem:
         for scheme, test_url in (("https", TEST_URL), ("http", "http://httpbin.org/anything")):
             t0 = time.perf_counter()
@@ -176,7 +176,7 @@ async def probe(session, proxy: str, sem: asyncio.Semaphore, my_ip: str, timeout
                 continue
             exit_ip = str(data.get("origin", "")).split(",")[0].strip()
             if not exit_ip or exit_ip == my_ip:
-                return None  # transparent: IP asli ikut bocor
+                return None  # transparent: the real IP leaks through
 
             headers = {k.lower() for k in data.get("headers", {})}
             leaks = bool(headers & {"x-forwarded-for", "x-real-ip", "via", "forwarded"})
@@ -190,14 +190,14 @@ async def probe(session, proxy: str, sem: asyncio.Semaphore, my_ip: str, timeout
     return None
 
 
-# test massal
+# bulk test
 async def test_many(
     proxies: list[str],
     concurrency: int = 200,
     timeout: int = 8,
     on_progress=None,
 ) -> dict:
-    """Uji banyak proxy. Kembalikan {'alive', 'dead', 'my_ip', 'elapsed'}."""
+    """Test many proxies. Returns {'alive', 'dead', 'my_ip', 'elapsed'}."""
     proxies = list(dict.fromkeys(proxies))
     sem = asyncio.Semaphore(concurrency)
     alive: list[dict] = []
@@ -233,13 +233,13 @@ async def test_many(
 
 def summarize(alive: list[dict]) -> dict:
     if not alive:
-        return {"hidup": 0, "https": 0, "elite": 0, "median_ms": 0, "tercepat": "-"}
+        return {"alive": 0, "https": 0, "elite": 0, "median_ms": 0, "fastest": "-"}
     return {
-        "hidup": len(alive),
+        "alive": len(alive),
         "https": sum(1 for a in alive if a["scheme"] == "https"),
         "elite": sum(1 for a in alive if a["anon"] == "elite"),
         "median_ms": alive[len(alive) // 2]["latency_ms"],
-        "tercepat": f"{alive[0]['proxy']} ({alive[0]['latency_ms']}ms)",
+        "fastest": f"{alive[0]['proxy']} ({alive[0]['latency_ms']}ms)",
     }
 
 

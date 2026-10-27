@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""ppp - proxy pool terminal.
+"""Proxy Pool (PP) - proxy pool terminal.
 
-Dua mode:
-  interaktif   python cli.py             -> REPL interaktif
-  satu tembak  python cli.py harvest
+Two modes:
+  interactive  python cli.py             -> interactive REPL
+  one-shot     python cli.py harvest
                python cli.py test --limit 200
                python cli.py ai farm 40 --test
 """
@@ -13,7 +13,7 @@ import argparse
 import asyncio
 import sys
 
-# readline: riwayat panah atas/bawah (opsional, tidak tersedia di semua platform)
+# readline: up/down arrow history (optional, not available on every platform)
 try:
     import readline  # noqa: F401
 
@@ -21,32 +21,32 @@ try:
 except Exception:
     _HAS_READLINE = False
 
-from ppp import engine, shell, ui
+from pp import engine, shell, ui
 
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        prog="ppp",
-        description="proxy pool terminal - scrape, probe, pool",
-        epilog="tanpa argumen = mode interaktif",
+        prog="pp",
+        description="Proxy Pool terminal - scrape, probe, pool",
+        epilog="no arguments = interactive mode",
     )
     sub = ap.add_subparsers(dest="cmd")
 
-    sub.add_parser("shell", help="mulai mode interaktif (default)")
-    sub.add_parser("help", help="daftar perintah")
-    sub.add_parser("status", help="ringkasan state")
-    sub.add_parser("doctor", help="cek dependensi dan koneksi")
+    sub.add_parser("shell", help="start interactive mode (default)")
+    sub.add_parser("help", help="command list")
+    sub.add_parser("status", help="state summary")
+    sub.add_parser("doctor", help="check dependencies and connection")
 
-    h = sub.add_parser("harvest", help="scrape semua sumber")
+    h = sub.add_parser("harvest", help="scrape all sources")
     h.add_argument("--timeout", type=int)
 
-    t = sub.add_parser("test", help="uji kandidat/pool")
+    t = sub.add_parser("test", help="test candidates/pool")
     t.add_argument("--limit", type=int, default=0)
     t.add_argument("--src", choices=["cand", "pool"], default="cand")
     t.add_argument("-c", "--concurrency", type=int)
     t.add_argument("--timeout", type=int)
 
-    p = sub.add_parser("pool", help="lihat pool")
+    p = sub.add_parser("pool", help="show pool")
     p.add_argument("--limit", type=int, default=40)
     p.add_argument("--sort", choices=["lat", "ip"], default="lat")
 
@@ -54,23 +54,23 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("format", nargs="?", default="txt", choices=["json", "txt", "csv", "env"])
     e.add_argument("path", nargs="?")
 
-    c = sub.add_parser("check", help="uji satu proxy")
+    c = sub.add_parser("check", help="test one proxy")
     c.add_argument("proxy")
 
-    i = sub.add_parser("import", help="import proxy manual")
+    i = sub.add_parser("import", help="import proxies manually")
     i.add_argument("items", nargs="+", help="ip:port ... | file <path> | url <url>")
 
-    s = sub.add_parser("source", help="kelola sumber")
+    s = sub.add_parser("source", help="manage sources")
     s.add_argument("action", nargs="?", default="list", choices=["list", "add", "rm"])
     s.add_argument("value", nargs="?")
     s.add_argument("kind", nargs="?", default="raw")
 
-    a = sub.add_parser("ai", help="lane AI")
+    a = sub.add_parser("ai", help="AI lane")
     a.add_argument("action", nargs="?", default="status", choices=["status", "ping", "farm", "sources", "review"])
     a.add_argument("n", nargs="?", type=int)
     a.add_argument("--test", action="store_true")
 
-    cfg = sub.add_parser("config", help="lihat/ubah config")
+    cfg = sub.add_parser("config", help="view/change config")
     cfg.add_argument("key", nargs="?")
     cfg.add_argument("value", nargs="*")
 
@@ -78,7 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def to_shell_args(ns: argparse.Namespace) -> list[str]:
-    """Ubah namespace argparse jadi argv gaya shell internal."""
+    """Turn an argparse namespace into internal shell-style argv."""
     cmd = ns.cmd
     if cmd == "harvest":
         return ["harvest"] + (["--timeout", str(ns.timeout)] if ns.timeout else [])
@@ -137,7 +137,7 @@ def main() -> int:
         return 130
     except ModuleNotFoundError as e:
         if "aiohttp" in str(e):
-            ui.err("aiohttp belum terpasang")
+            ui.err("aiohttp is not installed")
             ui.note("pip install aiohttp")
             return 1
         raise
